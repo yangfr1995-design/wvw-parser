@@ -1,0 +1,3 @@
+package main
+
+// ...moved to config/config.go...

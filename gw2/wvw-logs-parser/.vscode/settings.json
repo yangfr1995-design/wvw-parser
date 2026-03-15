@@ -1,0 +1,19 @@
+{
+  "go.enableCodeLens": {
+    "references": true,
+    "runtest": true
+  },
+  "go.codelens.run": true,
+  "go.codelens.test": true,
+  "go.lintOnSave": "package",
+  "go.useLanguageServer": true,
+  "gopls": {
+    "ui.codelenses": {
+      "run_govulncheck": true,
+      "gc_details": true,
+      "generate": true,
+      "test": true,
+      "bench": true
+    }
+  }
+}
