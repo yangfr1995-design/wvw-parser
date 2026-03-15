@@ -2,7 +2,7 @@ package parser
 
 type Fight struct {
 	Name           string                 `json:"fightName"`
-	Duration       int                    `json:"fightDuration"`
+	Duration       int                    `json:"durationMS"`
 	Players        []Player               `json:"players"`
 	CombatData     []RawCombatEvent       `json:"combatData"`
 	DamageTimeline map[int]*TimelineEntry `json:"damageTimeline"`
