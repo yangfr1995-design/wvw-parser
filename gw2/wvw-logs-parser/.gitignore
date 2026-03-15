@@ -13,3 +13,6 @@
 /bin/**
 # Ignore sampleLogs directory
 sampleLogs/
+# Ignore gw2-logs directory (all variants)
+gw2-logs/
+/gw2-logs/
