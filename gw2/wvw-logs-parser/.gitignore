@@ -11,3 +11,5 @@
 # Ignore bin subfolders
 /bin/*
 /bin/**
+# Ignore sampleLogs directory
+sampleLogs/
