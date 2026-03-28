@@ -19,10 +19,13 @@ type SpikeDamage struct {
 
 // AnalyzeSpikedDamage finds periods where a player dealt very high damage
 // It looks for windows where cumulative damage exceeds a threshold
-func AnalyzeSpikedDamage(fight *parser.Fight, windowSizeSeconds int, minThreshold int, increaseThreshold float64) map[string][]SpikeDamage {
+func AnalyzeSpikedDamage(fight *parser.Fight, windowSizeSeconds int, minThreshold int, increaseThreshold float64, minDPS int) map[string][]SpikeDamage {
 	spikes := make(map[string][]SpikeDamage)
 	minThresholdFactor := 0.1 // 10% of average bracket damage
 	for _, player := range fight.Players {
+		if len(player.DpsAll) == 0 || player.DpsAll[0].Dps <= minDPS {
+			continue
+		}
 		// Calculate average bracket damage for this player
 		playerID := player.ID
 		maxSec := fight.Duration / 1000
@@ -96,23 +99,33 @@ func findSpikes(player parser.Player, fight *parser.Fight, minThreshold int, inc
 		}
 		sum := 0
 		peak := 0
+		firstActive, lastActive := -1, -1
 		for j := start; j < end; j++ {
 			sum += damagePerSecond[j]
 			if damagePerSecond[j] > peak {
 				peak = damagePerSecond[j]
 			}
+			if damagePerSecond[j] > 0 {
+				if firstActive == -1 {
+					firstActive = j
+				}
+				lastActive = j
+			}
 		}
-		fmt.Printf("Player: %s, Bracket %d (%d-%d): Damage=%d\n", player.Name, i, start, end-1, sum)
+		if firstActive == -1 {
+			firstActive = start
+			lastActive = end - 1
+		}
 		if i > 0 && prevBracketSum > 0 {
 			increase := float64(sum-prevBracketSum) / float64(prevBracketSum)
 			if increase >= increaseThreshold {
 				spike := SpikeDamage{
 					PlayerName:    player.Name,
-					StartTime:     start * 1000,
-					EndTime:       (end - 1) * 1000,
-					Duration:      (end - start) * 1000,
+					StartTime:     firstActive * 1000,
+					EndTime:       lastActive * 1000,
+					Duration:      (lastActive - firstActive + 1) * 1000,
 					DamageAmount:  sum,
-					DPS:           float64(sum) / float64(end-start),
+					DPS:           float64(sum) / float64(lastActive-firstActive+1),
 					PeakDamageInS: peak,
 				}
 				result = append(result, spike)

@@ -38,7 +38,7 @@ func StartWorkerPool(logs []string, workers int, cli string) {
 				// output.PrintFight(summary)
 
 				// Run spike damage analysis
-				spikeDamage := analysis.AnalyzeSpikedDamage(fight, 5, 0, config.AppConfig.SpikeIncreaseThreshold)
+				spikeDamage := analysis.AnalyzeSpikedDamage(fight, 5, 0, config.AppConfig.SpikeIncreaseThreshold, config.AppConfig.MinSpikeDPS)
 				output.PrintSpikeDamageAnalysis(spikeDamage)
 
 				// Run well skill timing analysis

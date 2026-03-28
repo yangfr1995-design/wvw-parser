@@ -4,12 +4,11 @@ type Fight struct {
 	Name           string                 `json:"fightName"`
 	Duration       int                    `json:"durationMS"`
 	Players        []Player               `json:"players"`
-	CombatData     []RawCombatEvent       `json:"combatData"`
 	DamageTimeline map[int]*TimelineEntry `json:"damageTimeline"`
 }
 
 type Player struct {
-	ID         int    `json:"id"`
+	ID         int    `json:"instanceID"`
 	Name       string `json:"name"`
 	Profession string `json:"profession"`
 	Group      int    `json:"group"`
@@ -27,6 +26,8 @@ type Player struct {
 	} `json:"defenses"`
 
 	Rotation []RotationEntry `json:"rotation"`
+
+	Damage1S [][]int `json:"damage1S"`
 }
 
 type Buff struct {
@@ -44,21 +45,6 @@ type Skill struct {
 	Duration   int     `json:"duration"`
 	TimeGained int     `json:"timeGained"`
 	Quickness  float64 `json:"quickness"`
-}
-
-type RawCombatEvent struct {
-	Time   int `json:"time"`
-	Src    int `json:"src"`
-	Dst    int `json:"dst"`
-	Value  int `json:"value"`
-	IsBuff int `json:"isBuff"`
-}
-
-type DamageEvent struct {
-	Time   int
-	Source int
-	Target int
-	Damage int
 }
 
 type TimelineEntry struct {
