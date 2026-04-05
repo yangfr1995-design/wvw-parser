@@ -1,0 +1,141 @@
+.empty {
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.chartWrap {
+  margin-bottom: 20px;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.windowLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent2);
+}
+
+.badgeWell {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: rgba(99,102,241,.15);
+  color: var(--accent2);
+}
+
+.badgeSpike {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: rgba(34,211,238,.15);
+  color: var(--cyan);
+}
+
+.totalDmg {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.totalDmg strong {
+  color: var(--text);
+}
+
+.wellPlayers {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.wellNames {
+  color: var(--accent2);
+}
+
+.barBg {
+  background: var(--surface3);
+  border-radius: 3px;
+  height: 6px;
+  margin-bottom: 10px;
+}
+
+.barFill {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cyan));
+  transition: width 0.3s;
+}
+
+.spikeTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.spikeTable td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.spikeTable tr:last-child td {
+  border-bottom: none;
+}
+
+.rank {
+  font-size: 11px;
+  color: var(--muted);
+  width: 20px;
+}
+
+.spikeName {
+  font-weight: 500;
+  min-width: 120px;
+}
+
+.spikeBar {
+  width: 100%;
+}
+
+.barFillCyan {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--cyan);
+  transition: width 0.3s;
+}
+
+.spikeDmg {
+  font-weight: 600;
+  white-space: nowrap;
+  padding-left: 10px;
+}
+
+.spikeDps {
+  color: var(--cyan);
+  font-size: 11px;
+  white-space: nowrap;
+  padding-left: 8px;
+}

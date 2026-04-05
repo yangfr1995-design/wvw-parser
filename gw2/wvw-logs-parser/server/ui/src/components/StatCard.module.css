@@ -1,0 +1,24 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--accent2);
+  line-height: 1;
+}
+
+.value.danger  { color: var(--red); }
+.value.success { color: var(--green); }
+
+.label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}

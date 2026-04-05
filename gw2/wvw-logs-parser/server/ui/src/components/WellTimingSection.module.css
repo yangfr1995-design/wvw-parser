@@ -1,0 +1,82 @@
+.empty {
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.badgeGreen {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(34,197,94,.15);
+  color: var(--green);
+}
+
+.badgeRed {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(239,68,68,.15);
+  color: var(--red);
+}
+
+.muted {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.chartWrap {
+  width: 100%;
+}
+
+.legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.dotGreen, .dotRed {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.dotGreen { background: var(--green); }
+.dotRed   { background: var(--red); }
+
+.bandSwatch {
+  display: inline-block;
+  width: 14px;
+  height: 8px;
+  background: rgba(99,102,241,.18);
+  border: 1px dashed rgba(99,102,241,.5);
+  margin-right: 4px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+.tooltip {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+}

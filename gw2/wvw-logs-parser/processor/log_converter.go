@@ -11,12 +11,17 @@ import (
 func ConvertLog(cli string, log string) (string, error) {
 
 	configPath := "/Users/ryan/Desktop/projects/gw2/wvw-logs-parser/bin/parser.conf"
-	outputDir := "/Users/ryan/Desktop/projects/gw2-logs/generated"
+	// With SaveAtOut=false EI writes the JSON next to the input log file.
+	outputDir := filepath.Dir(log)
 
-	// Create output directory if it doesn't exist
-	err := os.MkdirAll(outputDir, 0755)
-	if err != nil {
-		return "", fmt.Errorf("failed to create output directory: %w", err)
+	// Snapshot existing JSON files so we can detect the new one by diff.
+	before := map[string]struct{}{}
+	if entries, err := os.ReadDir(outputDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
+				before[e.Name()] = struct{}{}
+			}
+		}
 	}
 
 	cmd := exec.Command(
@@ -28,27 +33,37 @@ func ConvertLog(cli string, log string) (string, error) {
 
 	// Capture output for debugging
 	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+	if len(output) > 0 {
+		fmt.Printf("EliteInsights [%s]: %s\n", filepath.Base(log), outputStr)
+	}
 	if err != nil {
-		fmt.Printf("EliteInsights error output: %s\n", string(output))
 		return "", fmt.Errorf("EliteInsights failed: %w", err)
 	}
 
-	// Find the generated JSON file in the output directory
-	// EliteInsights generates files with format: <filename>_<encounter>.json
-	logName := filepath.Base(log)
-	logNameWithoutExt := strings.TrimSuffix(logName, filepath.Ext(logName))
+	// EI exits 0 even on parse failures — detect them from its output.
+	if strings.Contains(outputStr, "Parsing Failure") {
+		// Extract the reason after the last ": " for a concise message.
+		reason := "parsing failure"
+		if idx := strings.LastIndex(outputStr, ": "); idx >= 0 {
+			reason = strings.TrimSpace(outputStr[idx+2:])
+		}
+		return "", fmt.Errorf("parsing failure: %s", reason)
+	}
 
-	// Search for the JSON file matching the input log name
+	// Find whichever new JSON appeared in the output directory after the run.
 	entries, err := os.ReadDir(outputDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to read output directory: %w", err)
 	}
 
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasPrefix(entry.Name(), logNameWithoutExt) && strings.HasSuffix(entry.Name(), ".json") {
-			return filepath.Join(outputDir, entry.Name()), nil
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
+			if _, existed := before[entry.Name()]; !existed {
+				return filepath.Join(outputDir, entry.Name()), nil
+			}
 		}
 	}
 
-	return "", fmt.Errorf("no JSON file generated for log: %s", logName)
+	return "", fmt.Errorf("no JSON file generated for log: %s", filepath.Base(log))
 }

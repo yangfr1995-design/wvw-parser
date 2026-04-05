@@ -1,21 +1,18 @@
 package main
 
 import (
-	"fmt"
+	"log"
 
-	"github.com/ryan/wvwlog/config"
-	"github.com/ryan/wvwlog/processor"
+	"github.com/ryan/wvwlog/server"
 )
 
 func main() {
+	log.Println("Starting WvW Log Analyzer Dashboard")
 
-	fmt.Println("Starting WvW Log Analyzer")
+	server.LoadFights()
+	server.StartWatcher()
 
-	jobs := processor.ScanFolder(config.AppConfig.LogFolder)
-
-	processor.StartWorkerPool(
-		jobs,
-		config.AppConfig.WorkerCount,
-		config.AppConfig.EliteInsightsCLI,
-	)
+	if err := server.Start(":8080"); err != nil {
+		log.Fatal(err)
+	}
 }

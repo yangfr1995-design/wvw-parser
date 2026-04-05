@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WvW Log Analyzer</title>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #181b27;
+      --surface2:  #1f2235;
+      --surface3:  #262a40;
+      --border:    #2c3050;
+      --text:      #dde3f0;
+      --muted:     #7b839a;
+      --accent:    #6366f1;
+      --accent2:   #818cf8;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --amber:     #f59e0b;
+      --cyan:      #22d3ee;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ────────────────────────────────────────────────────────── */
+    .sidebar {
+      width: 256px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-head {
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-head h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent2);
+      letter-spacing: 0.3px;
+    }
+    .sidebar-head p {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .fight-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .fight-item {
+      padding: 9px 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 3px;
+      border: 1px solid transparent;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .fight-item:hover { background: var(--surface2); }
+    .fight-item.active {
+      background: var(--surface2);
+      border-color: var(--accent);
+    }
+    .fight-item-name {
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .fight-item-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── Main panel ─────────────────────────────────────────────────────── */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+    }
+    .placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 50vh;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .loading {
+      text-align: center;
+      color: var(--muted);
+      padding: 60px 0;
+      font-size: 14px;
+    }
+    .no-data {
+      text-align: center;
+      color: var(--muted);
+      padding: 24px;
+      font-size: 13px;
+      font-style: italic;
+    }
+
+    /* ── Fight header ───────────────────────────────────────────────────── */
+    .fight-heading { margin-bottom: 6px; font-size: 22px; font-weight: 700; }
+    .fight-subhead { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+
+    /* ── Stat cards row ─────────────────────────────────────────────────── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .stat-val { font-size: 26px; font-weight: 700; color: var(--accent2); line-height: 1; }
+    .stat-val.danger { color: var(--red); }
+    .stat-val.success { color: var(--green); }
+    .stat-label { font-size: 10px; color: var(--muted); margin-top: 5px; text-transform: uppercase; letter-spacing: 0.6px; }
+
+    /* ── Section cards ──────────────────────────────────────────────────── */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .section-head {
+      padding: 14px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .section-head h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.2px; }
+    .section-head p { font-size: 11px; color: var(--muted); }
+    .section-body { padding: 16px 18px; }
+
+    /* ── Tables ─────────────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    thead th {
+      text-align: left;
+      padding: 7px 10px;
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--surface2); }
+
+    /* ── Badges ─────────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-green  { background: rgba(34,197,94,.15);  color: var(--green); }
+    .badge-red    { background: rgba(239,68,68,.15);  color: var(--red); }
+    .badge-amber  { background: rgba(245,158,11,.15); color: var(--amber); }
+    .badge-accent { background: rgba(99,102,241,.15); color: var(--accent2); }
+    .badge-cyan   { background: rgba(34,211,238,.15); color: var(--cyan); }
+
+    /* ── Profession colors ──────────────────────────────────────────────── */
+    .p-Necromancer  { color: #52a76f; }
+    .p-Guardian     { color: #72c1d9; }
+    .p-Elementalist { color: #f68a87; }
+    .p-Mesmer       { color: #b679d5; }
+    .p-Ranger       { color: #8cdc82; }
+    .p-Warrior      { color: #ffe666; }
+    .p-Engineer     { color: #d09c59; }
+    .p-Thief        { color: #c08f95; }
+    .p-Revenant     { color: #d16e5a; }
+
+    /* ── Timeline (SVG wrapper) ──────────────────────────────────────────── */
+    .timeline-wrap { overflow-x: auto; }
+    .timeline-wrap svg { min-width: 600px; display: block; }
+    .timeline-legend {
+      display: flex;
+      gap: 18px;
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+    .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+    /* ── Overlap cards ──────────────────────────────────────────────────── */
+    .overlap-cards { display: flex; flex-direction: column; gap: 10px; }
+    .overlap-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+    .overlap-card-head {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .overlap-time { font-size: 13px; font-weight: 700; color: var(--accent2); }
+    .overlap-total { font-size: 12px; }
+    .overlap-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .overlap-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); }
+    .overlap-table tr:last-child td { border-bottom: none; }
+    .bar-bg { background: var(--surface3); border-radius: 3px; height: 6px; }
+    .bar-fill { height: 6px; border-radius: 3px; background: var(--accent); }
+
+    /* ── Scrollbar ──────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-head">
+    <h1>⚔ WvW Log Analyzer</h1>
+    <p id="fight-count">Loading…</p>
+  </div>
+  <div class="fight-list" id="fight-list"></div>
+</aside>
+
+<main class="main" id="main">
+  <div class="placeholder">← Select a fight to view analysis</div>
+</main>
+
+<script>
+/* ─────────────────────────────── helpers ─────────────────────────────────── */
+
+function fmtMs(ms) {
+  const s = (ms / 1000);
+  return s >= 60
+    ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`
+    : `${s.toFixed(1)}s`;
+}
+
+function fmtSec(ms) { return `${(ms / 1000).toFixed(1)}s`; }
+
+function fmtDmg(d) {
+  if (d >= 1_000_000) return `${(d / 1_000_000).toFixed(2)}M`;
+  if (d >= 1_000)     return `${(d / 1_000).toFixed(1)}k`;
+  return String(d);
+}
+
+function fmtDps(d)   { return `${Math.round(d).toLocaleString()}`; }
+function profClass(p) { return `p-${p}`; }
+
+function badge(text, cls) {
+  return `<span class="badge badge-${cls}">${text}</span>`;
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ─────────────────────────────── data loading ────────────────────────────── */
+
+async function init() {
+  try {
+    const resp = await fetch('/api/fights');
+    const fights = await resp.json();
+    renderSidebar(fights);
+  } catch (e) {
+    document.getElementById('fight-list').innerHTML =
+      `<div class="no-data">Error: ${esc(e.message)}</div>`;
+    document.getElementById('fight-count').textContent = 'error loading';
+  }
+}
+
+function renderSidebar(fights) {
+  const list  = document.getElementById('fight-list');
+  const count = document.getElementById('fight-count');
+
+  if (!fights || fights.length === 0) {
+    list.innerHTML  = '<div class="no-data">No fights found</div>';
+    count.textContent = '0 fights';
+    return;
+  }
+
+  count.textContent = `${fights.length} fight${fights.length !== 1 ? 's' : ''}`;
+  list.innerHTML = fights.map(f => `
+    <div class="fight-item" data-id="${esc(f.id)}" onclick="selectFight('${esc(f.id)}')">
+      <div class="fight-item-name">${esc(f.name || f.id)}</div>
+      <div class="fight-item-meta">${fmtMs(f.durationMs)} · ${f.playerCount} players</div>
+    </div>
+  `).join('');
+}
+
+async function selectFight(id) {
+  document.querySelectorAll('.fight-item').forEach(el => el.classList.remove('active'));
+  const item = document.querySelector(`[data-id="${id}"]`);
+  if (item) item.classList.add('active');
+
+  document.getElementById('main').innerHTML = '<div class="loading">Loading…</div>';
+
+  try {
+    const resp = await fetch(`/api/fights/${encodeURIComponent(id)}`);
+    if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+    const data = await resp.json();
+    renderFight(data);
+  } catch (e) {
+    document.getElementById('main').innerHTML =
+      `<div class="loading">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+/* ─────────────────────────────── fight render ────────────────────────────── */
+
+function renderFight(data) {
+  const { meta, players, wellTiming, spikeDamage, syncedOverlap } = data;
+
+  // Aggregate OOS info
+  const oosByPlayer = {};
+  let totalOos = 0;
+  for (const [, analysis] of Object.entries(wellTiming || {})) {
+    for (const ct of (analysis.OutOfSyncCasts || [])) {
+      totalOos++;
+      if (!oosByPlayer[ct.PlayerName]) oosByPlayer[ct.PlayerName] = [];
+      oosByPlayer[ct.PlayerName].push(ct.CastTime);
+    }
+  }
+
+  // Total well casts
+  let totalWellCasts = 0;
+  for (const [, a] of Object.entries(wellTiming || {})) {
+    totalWellCasts += (a.AllCastTimes || []).length;
+  }
+
+  // Total spike events
+  let totalSpikes = 0;
+  for (const spks of Object.values(spikeDamage || {})) {
+    totalSpikes += spks.length;
+  }
+
+  const oosVal = totalOos > 0
+    ? `<div class="stat-val danger">${totalOos}</div>`
+    : `<div class="stat-val success">0</div>`;
+
+  const html = `
+    <div class="fight-heading">${esc(meta.name || meta.id)}</div>
+    <div class="fight-subhead">${fmtMs(meta.durationMs)} · ${meta.playerCount} players</div>
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-val">${meta.playerCount}</div>
+        <div class="stat-label">Players</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${totalWellCasts}</div>
+        <div class="stat-label">Well Casts</div>
+      </div>
+      <div class="stat-card">
+        ${oosVal}
+        <div class="stat-label">Out-of-Sync Casts</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${totalSpikes}</div>
+        <div class="stat-label">Spike Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${(syncedOverlap || []).length}</div>
+        <div class="stat-label">Sync+Spike Overlaps</div>
+      </div>
+    </div>
+
+    ${renderWellSection(wellTiming, meta.durationMs)}
+    ${renderOosSection(oosByPlayer)}
+    ${renderSpikeSection(spikeDamage, players)}
+    ${renderOverlapSection(syncedOverlap)}
+  `;
+
+  document.getElementById('main').innerHTML = html;
+}
+
+/* ─────────────────── Section 1 · Well Cast Timing ─────────────────────────── */
+
+function renderWellSection(wellTiming, durationMs) {
+  if (!wellTiming || Object.keys(wellTiming).length === 0) {
+    return section('Well Cast Timing', 'No well skills were cast in this fight.',
+      '<div class="no-data">No well skills detected</div>');
+  }
+
+  let body = '';
+  for (const [, analysis] of Object.entries(wellTiming)) {
+    const totalCasts   = (analysis.AllCastTimes  || []).length;
+    const syncGroups   = (analysis.SyncWindows   || []).length;
+    const oosCasts     = (analysis.OutOfSyncCasts|| []).length;
+    const statusBadge  = analysis.Synchronized
+      ? badge('SYNCED', 'green')
+      : badge('OUT OF SYNC', 'red');
+
+    body += `
+      <div style="margin-bottom: 24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <span style="font-size:13px;font-weight:600;">${esc(analysis.SkillName)}</span>
+          ${statusBadge}
+          <span style="font-size:11px;color:var(--muted);">
+            ${totalCasts} casts · ${syncGroups} sync group${syncGroups !== 1 ? 's' : ''}
+            ${oosCasts > 0 ? ` · <span style="color:var(--red)">${oosCasts} out-of-sync</span>` : ''}
+          </span>
+        </div>
+        <div class="timeline-wrap">
+          ${buildTimeline(analysis, durationMs)}
+        </div>
+        <div class="timeline-legend">
+          <span><span class="legend-dot" style="background:var(--green)"></span>Synced cast</span>
+          <span><span class="legend-dot" style="background:var(--red)"></span>Out-of-sync cast</span>
+          <span>
+            <span style="display:inline-block;width:14px;height:8px;
+                         background:rgba(99,102,241,.18);border:1px dashed rgba(99,102,241,.5);
+                         margin-right:4px;vertical-align:middle;"></span>Sync window
+          </span>
+        </div>
+      </div>`;
+  }
+
+  return section('Well Cast Timing',
+    'Timeline of well skill casts per player. Shaded bands mark synchronized windows.',
+    body);
+}
+
+function buildTimeline(analysis, durationMs) {
+  const allCasts   = analysis.AllCastTimes   || [];
+  const syncWins   = analysis.SyncWindows    || [];
+  const oosCasts   = analysis.OutOfSyncCasts || [];
+
+  // Build a set of out-of-sync cast keys for fast lookup
+  const oosKey = (c) => `${c.PlayerName}|${c.CastTime}`;
+  const oosSet = new Set((oosCasts).map(oosKey));
+
+  // Group casts by player (preserving encounter order)
+  const playerOrder = [];
+  const playerCasts = {};
+  for (const ct of allCasts) {
+    if (!playerCasts[ct.PlayerName]) {
+      playerOrder.push(ct.PlayerName);
+      playerCasts[ct.PlayerName] = [];
+    }
+    playerCasts[ct.PlayerName].push({ time: ct.CastTime, oos: oosSet.has(oosKey(ct)) });
+  }
+
+  const nPlayers = playerOrder.length;
+  if (nPlayers === 0) return '<div class="no-data">No casts</div>';
+
+  const ROW_H   = 34;
+  const LABEL_W = 148;
+  const PAD     = 12;
+  const SVG_W   = 820;
+  const TRACK_W = SVG_W - LABEL_W - PAD * 2;
+  const AXIS_H  = 18;
+  const SVG_H   = nPlayers * ROW_H + AXIS_H + 8;
+
+  const toX = (ms) => LABEL_W + PAD + (ms / durationMs) * TRACK_W;
+
+  let svg = `<svg viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg"
+       style="width:100%;height:auto;overflow:visible;">`;
+
+  // Grid lines + axis labels
+  const ticks = 8;
+  for (let i = 0; i <= ticks; i++) {
+    const x = LABEL_W + PAD + (i / ticks) * TRACK_W;
+    const t = (i / ticks) * durationMs / 1000;
+    svg += `<line x1="${x}" y1="0" x2="${x}" y2="${nPlayers * ROW_H}"
+              stroke="#2c3050" stroke-width="1" stroke-dasharray="3,4"/>`;
+    svg += `<text x="${x}" y="${SVG_H - 3}" text-anchor="middle"
+              fill="#7b839a" font-size="9.5" font-family="sans-serif">${t.toFixed(0)}s</text>`;
+  }
+
+  // Sync window bands (span all rows)
+  for (const g of syncWins) {
+    const x1 = toX(g.StartTime);
+    const x2 = Math.max(toX(g.EndTime), x1 + 3);
+    svg += `<rect x="${x1}" y="0" width="${x2 - x1}" height="${nPlayers * ROW_H}"
+              fill="rgba(99,102,241,0.13)" stroke="rgba(99,102,241,0.4)"
+              stroke-width="1" stroke-dasharray="4,3"/>`;
+  }
+
+  // Player rows
+  playerOrder.forEach((name, i) => {
+    const rowY  = i * ROW_H;
+    const midY  = rowY + ROW_H / 2;
+
+    // Row background
+    if (i % 2 === 1) {
+      svg += `<rect x="${LABEL_W}" y="${rowY}" width="${TRACK_W + PAD * 2}"
+                height="${ROW_H}" fill="rgba(255,255,255,0.015)"/>`;
+    }
+
+    // Label
+    const label = name.length > 20 ? name.slice(0, 18) + '…' : name;
+    svg += `<text x="${LABEL_W - 8}" y="${midY + 4}" text-anchor="end"
+              fill="#9aa0b8" font-size="11" font-family="sans-serif">${esc(label)}</text>`;
+
+    // Horizontal track line
+    svg += `<line x1="${LABEL_W + PAD}" y1="${midY}" x2="${LABEL_W + PAD + TRACK_W}" y2="${midY}"
+              stroke="#2c3050" stroke-width="1"/>`;
+
+    // Cast markers
+    for (const cast of playerCasts[name]) {
+      const cx    = toX(cast.time);
+      const color = cast.oos ? '#ef4444' : '#22c55e';
+      const glow  = cast.oos ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)';
+      const label = `${name} · ${fmtSec(cast.time)}${cast.oos ? ' (out of sync)' : ''}`;
+
+      svg += `<circle cx="${cx}" cy="${midY}" r="9" fill="${glow}" opacity="0.35"/>`;
+      svg += `<circle cx="${cx}" cy="${midY}" r="5" fill="${color}">
+                <title>${esc(label)}</title>
+              </circle>`;
+    }
+  });
+
+  svg += `</svg>`;
+  return svg;
+}
+
+/* ─────────────────── Section 2 · Out-of-Sync Players ──────────────────────── */
+
+function renderOosSection(oosByPlayer) {
+  const players = Object.keys(oosByPlayer);
+
+  if (players.length === 0) {
+    return section('Players Out of Sync', 'All players cast wells within the sync window.',
+      `<div class="no-data">${badge('All synced!', 'green')} No out-of-sync casts detected.</div>`);
+  }
+
+  // Sort by most OOS casts first
+  players.sort((a, b) => oosByPlayer[b].length - oosByPlayer[a].length);
+
+  const rows = players.map(name => {
+    const times = oosByPlayer[name];
+    const timeTags = times
+      .map(t => `<span class="badge badge-red" style="margin:1px;">${fmtSec(t)}</span>`)
+      .join(' ');
+    return `<tr>
+      <td style="font-weight:500;">${esc(name)}</td>
+      <td><span style="color:var(--red);font-weight:700;">${times.length}</span></td>
+      <td>${timeTags}</td>
+    </tr>`;
+  }).join('');
+
+  const tbl = `
+    <table>
+      <thead><tr>
+        <th>Player</th>
+        <th>OOS Casts</th>
+        <th>Cast Times</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  return section('Players Out of Sync',
+    `${players.length} player${players.length !== 1 ? 's' : ''} had casts outside sync windows.`,
+    tbl);
+}
+
+/* ─────────────────── Section 3 · Spike Damage ─────────────────────────────── */
+
+function renderSpikeSection(spikeDamage, players) {
+  if (!spikeDamage || Object.keys(spikeDamage).length === 0) {
+    return section('Spike Damage', 'No damage spikes detected.',
+      '<div class="no-data">No spike damage detected</div>');
+  }
+
+  // Build a profession lookup from player list
+  const profMap = {};
+  for (const p of (players || [])) { profMap[p.Name] = p.Profession; }
+
+  // Flatten + sort by damage descending to find the max for bar scaling
+  const allSpikes = [];
+  for (const [pname, spks] of Object.entries(spikeDamage)) {
+    for (const s of spks) allSpikes.push({ ...s, PlayerName: pname });
+  }
+  if (allSpikes.length === 0) {
+    return section('Spike Damage', '', '<div class="no-data">No spikes recorded</div>');
+  }
+  const maxDmg = Math.max(...allSpikes.map(s => s.DamageAmount));
+
+  // Group back by player
+  const playerNames = Object.keys(spikeDamage).sort();
+
+  const rows = [];
+  for (const name of playerNames) {
+    const spks  = spikeDamage[name];
+    const prof  = profMap[name] || '';
+    if (!spks.length) continue;
+
+    for (const s of spks) {
+      const pct = maxDmg > 0 ? ((s.DamageAmount / maxDmg) * 100).toFixed(1) : 0;
+      rows.push(`<tr>
+        <td>
+          <span class="${profClass(prof)}" style="font-weight:500;">${esc(name)}</span>
+          ${prof ? `<span style="font-size:10px;color:var(--muted);margin-left:5px;">${esc(prof)}</span>` : ''}
+        </td>
+        <td style="font-family:monospace;font-size:11.5px;">${fmtSec(s.StartTime)} – ${fmtSec(s.EndTime)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="bar-bg" style="flex:1;">
+              <div class="bar-fill" style="width:${pct}%"></div>
+            </div>
+            <span style="flex-shrink:0;font-weight:600;">${fmtDmg(s.DamageAmount)}</span>
+          </div>
+        </td>
+        <td style="color:var(--cyan);font-weight:600;">${fmtDps(s.DPS)} <span style="color:var(--muted);font-weight:400;">dps</span></td>
+        <td style="color:var(--muted);font-size:11px;">${fmtDmg(s.PeakDamageInS)}/s peak</td>
+      </tr>`);
+    }
+  }
+
+  const tbl = `
+    <table>
+      <thead><tr>
+        <th>Player</th>
+        <th>Window</th>
+        <th>Damage</th>
+        <th>Avg DPS</th>
+        <th>Peak</th>
+      </tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>`;
+
+  return section('Spike Damage', 'Periods where a player\'s damage significantly exceeded their average bracket.',
+    tbl);
+}
+
+/* ─────────────────── Section 4 · Synced Spikes & Wells ────────────────────── */
+
+function renderOverlapSection(syncedOverlap) {
+  if (!syncedOverlap || syncedOverlap.length === 0) {
+    return section('Synced Spikes + Wells', 'No damage spikes overlapped well sync windows.',
+      '<div class="no-data">No overlapping spike + well sync windows detected</div>');
+  }
+
+  const maxDmg = Math.max(...syncedOverlap.map(o => o.TotalDamage));
+
+  const cards = syncedOverlap.map(overlap => {
+    const windowLabel = `${fmtSec(overlap.SyncWindowStart)} – ${fmtSec(overlap.SyncWindowEnd)}`;
+    const wellList = (overlap.WellPlayers || []).map(p => esc(p)).join(', ');
+
+    const spikePct = maxDmg > 0 ? ((overlap.TotalDamage / maxDmg) * 100).toFixed(1) : 0;
+
+    const spikeRows = (overlap.PlayerSpikes || []).map((ps, idx) => {
+      const rowPct = overlap.TotalDamage > 0
+        ? ((ps.Damage / overlap.TotalDamage) * 100).toFixed(1)
+        : 0;
+      return `<tr>
+        <td style="font-size:11px;color:var(--muted);">${idx + 1}</td>
+        <td style="font-weight:500;">${esc(ps.PlayerName)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="bar-bg" style="flex:1;">
+              <div class="bar-fill" style="width:${rowPct}%;background:var(--cyan);"></div>
+            </div>
+            <span style="flex-shrink:0;font-size:12px;font-weight:600;">${fmtDmg(ps.Damage)}</span>
+          </div>
+        </td>
+        <td style="color:var(--cyan);font-size:11.5px;">${fmtDps(ps.DPS)} dps</td>
+      </tr>`;
+    }).join('');
+
+    return `
+      <div class="overlap-card">
+        <div class="overlap-card-head">
+          <span class="overlap-time">${windowLabel}</span>
+          ${badge('WELL SYNC', 'accent')}
+          ${badge('SPIKE', 'cyan')}
+          <span style="margin-left:auto;font-size:12px;color:var(--muted);">
+            Total dmg: <strong style="color:var(--text);">${fmtDmg(overlap.TotalDamage)}</strong>
+          </span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+          Wells cast by: <span style="color:var(--accent2);">${wellList}</span>
+        </div>
+        <div style="margin-bottom:8px;">
+          <div class="bar-bg">
+            <div class="bar-fill" style="width:${spikePct}%;background:linear-gradient(90deg,var(--accent),var(--cyan));height:8px;border-radius:3px;"></div>
+          </div>
+        </div>
+        <table class="overlap-table">
+          <tbody>${spikeRows}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  return section(
+    'Synced Spikes + Wells',
+    'Time windows where a well sync group and damage spikes coincided (±5s window).',
+    `<div class="overlap-cards">${cards}</div>`
+  );
+}
+
+/* ─────────────────────────────── util ────────────────────────────────────── */
+
+function section(title, subtitle, body) {
+  return `
+    <div class="section">
+      <div class="section-head">
+        <h2>${esc(title)}</h2>
+        ${subtitle ? `<p>${esc(subtitle)}</p>` : ''}
+      </div>
+      <div class="section-body">${body}</div>
+    </div>`;
+}
+
+/* ─────────────────────────────── boot ────────────────────────────────────── */
+init();
+</script>
+</body>
+</html>

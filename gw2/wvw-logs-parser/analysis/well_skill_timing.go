@@ -44,8 +44,10 @@ const (
 	// WellOfSuffering GW2 skill ID
 	WellOfSufferingID = 10546
 
-	// SyncThreshold: casts within this millisecond window are considered synchronized
-	SyncThresholdMS = 3000 // 500ms window
+	// SyncWindowMS: maximum span of a sync sub-window within a round window.
+	SyncWindowMS = 5000
+	// RoundWindowMS: the broad window used to segment casts into rounds.
+	RoundWindowMS = 35000
 )
 
 // AnalyzeWellSkillTiming extracts and analyzes Well skill casting patterns
@@ -96,7 +98,9 @@ func AnalyzeWellSkillTiming(fight *parser.Fight) map[int]*WellSyncAnalysis {
 	return analysis
 }
 
-// analyzeSync evaluates how synchronized casts were
+// analyzeSync segments casts into 35s round windows, finds the best 5s sync
+// sub-window within each round, and validates that at least half the players
+// who cast wells in the fight are present in the sync window.
 func analyzeSync(skillName string, skillID int, castTimes []WellSkillTiming) *WellSyncAnalysis {
 	result := &WellSyncAnalysis{
 		SkillName:    skillName,
@@ -105,37 +109,98 @@ func analyzeSync(skillName string, skillID int, castTimes []WellSkillTiming) *We
 	}
 
 	if len(castTimes) == 0 {
-		result.Synchronized = true // no casts = vacuously true
+		result.Synchronized = true
 		return result
 	}
 
-	// Count unique players who cast this well across the whole fight
-	uniquePlayerSet := map[string]bool{}
+	// Count distinct players who cast this well at all.
+	playerSet := map[string]bool{}
 	for _, ct := range castTimes {
-		uniquePlayerSet[ct.PlayerName] = true
+		playerSet[ct.PlayerName] = true
 	}
-	totalPlayers := len(uniquePlayerSet)
+	totalWellPlayers := len(playerSet)
+	minPlayersForSync := (totalWellPlayers + 1) / 2 // ceil(total/2)
 
-	// Group casts into time windows
-	allGroups := groupBySyncWindow(castTimes)
-
-	// A group qualifies as a sync group only if more than half of all
-	// well-casting players participated (counted by unique player names)
 	syncedIndices := map[int]bool{}
-	for _, g := range allGroups {
-		uniqueInGroup := map[string]bool{}
-		for _, p := range g.Players {
-			uniqueInGroup[p] = true
+
+	// Walk through casts in 35s round windows.
+	for start := 0; start < len(castTimes); {
+		roundStart := castTimes[start].CastTime
+		// Find end of this 35s round window.
+		end := start
+		for end < len(castTimes) && castTimes[end].CastTime-roundStart <= RoundWindowMS {
+			end++
 		}
-		if len(uniqueInGroup) > totalPlayers/2 {
-			result.SyncWindows = append(result.SyncWindows, g)
-			for _, idx := range g.CastIndices {
-				syncedIndices[idx] = true
+		roundIndices := make([]int, 0, end-start)
+		for i := start; i < end; i++ {
+			roundIndices = append(roundIndices, i)
+		}
+
+		// Within this round, sliding-window to find the 5s window with the most casts.
+		bestLo, bestCount := 0, 0
+		for lo := 0; lo < len(roundIndices); lo++ {
+			winStart := castTimes[roundIndices[lo]].CastTime
+			count := 0
+			for hi := lo; hi < len(roundIndices); hi++ {
+				if castTimes[roundIndices[hi]].CastTime-winStart <= SyncWindowMS {
+					count++
+				} else {
+					break
+				}
+			}
+			if count > bestCount {
+				bestCount = count
+				bestLo = lo
 			}
 		}
+
+		// Collect the indices inside the best 5s window.
+		winStart := castTimes[roundIndices[bestLo]].CastTime
+		var winIndices []int
+		for _, idx := range roundIndices[bestLo:] {
+			if castTimes[idx].CastTime-winStart <= SyncWindowMS {
+				winIndices = append(winIndices, idx)
+			} else {
+				break
+			}
+		}
+
+		// Count distinct players in this sync window.
+		winPlayers := map[string]bool{}
+		for _, idx := range winIndices {
+			winPlayers[castTimes[idx].PlayerName] = true
+		}
+
+		if len(winPlayers) >= minPlayersForSync {
+			// Valid sync window — mark all casts in it as synced.
+			syncStart := castTimes[winIndices[0]].CastTime
+			syncEnd := castTimes[winIndices[len(winIndices)-1]].CastTime
+
+			var players []string
+			for _, idx := range winIndices {
+				syncedIndices[idx] = true
+				players = append(players, castTimes[idx].PlayerName)
+			}
+
+			result.SyncWindows = append(result.SyncWindows, SyncGroup{
+				StartTime:   syncStart,
+				EndTime:     syncEnd,
+				Players:     players,
+				Diff:        syncEnd - syncStart,
+				CastIndices: winIndices,
+			})
+		}
+		// All casts in the round that are not in a valid sync window stay unsynced.
+
+		start = end
 	}
 
-	// Collect casts not in any qualifying sync group
+	// Sort sync windows by start time.
+	sort.Slice(result.SyncWindows, func(i, j int) bool {
+		return result.SyncWindows[i].StartTime < result.SyncWindows[j].StartTime
+	})
+
+	// Collect casts not in any valid sync window.
 	for i, ct := range castTimes {
 		if !syncedIndices[i] {
 			result.OutOfSyncCasts = append(result.OutOfSyncCasts, ct)
@@ -144,55 +209,17 @@ func analyzeSync(skillName string, skillID int, castTimes []WellSkillTiming) *We
 
 	result.Synchronized = len(result.OutOfSyncCasts) == 0
 
-	// Timing statistics across all casts
-	if len(castTimes) > 1 {
-		minTime := castTimes[0].CastTime
-		maxTime := castTimes[len(castTimes)-1].CastTime
-		result.MaxTimingDiff = maxTime - minTime
-
+	// Timing statistics: max and avg spread across ordinal groups.
+	if len(result.SyncWindows) > 0 {
 		var totalDiff int
-		for i := 1; i < len(castTimes); i++ {
-			totalDiff += castTimes[i].CastTime - castTimes[i-1].CastTime
+		for _, g := range result.SyncWindows {
+			if g.Diff > result.MaxTimingDiff {
+				result.MaxTimingDiff = g.Diff
+			}
+			totalDiff += g.Diff
 		}
-		result.AvgTimingDiff = float64(totalDiff) / float64(len(castTimes)-1)
+		result.AvgTimingDiff = float64(totalDiff) / float64(len(result.SyncWindows))
 	}
 
 	return result
-}
-
-// groupBySyncWindow groups casts that occur within the sync threshold
-func groupBySyncWindow(castTimes []WellSkillTiming) []SyncGroup {
-	if len(castTimes) == 0 {
-		return nil
-	}
-
-	var groups []SyncGroup
-	currentGroup := SyncGroup{
-		StartTime:   castTimes[0].CastTime,
-		EndTime:     castTimes[0].CastTime,
-		Players:     []string{castTimes[0].PlayerName},
-		CastIndices: []int{0},
-	}
-
-	for i := 1; i < len(castTimes); i++ {
-		diff := castTimes[i].CastTime - currentGroup.StartTime
-		if diff <= SyncThresholdMS {
-			currentGroup.EndTime = castTimes[i].CastTime
-			currentGroup.Players = append(currentGroup.Players, castTimes[i].PlayerName)
-			currentGroup.Diff = currentGroup.EndTime - currentGroup.StartTime
-			currentGroup.CastIndices = append(currentGroup.CastIndices, i)
-		} else {
-			groups = append(groups, currentGroup)
-			currentGroup = SyncGroup{
-				StartTime:   castTimes[i].CastTime,
-				EndTime:     castTimes[i].CastTime,
-				Players:     []string{castTimes[i].PlayerName},
-				Diff:        0,
-				CastIndices: []int{i},
-			}
-		}
-	}
-
-	groups = append(groups, currentGroup)
-	return groups
 }

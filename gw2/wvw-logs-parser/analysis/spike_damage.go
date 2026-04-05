@@ -1,8 +1,6 @@
 package analysis
 
 import (
-	"fmt"
-
 	"github.com/ryan/wvwlog/parser"
 )
 
@@ -22,22 +20,20 @@ type SpikeDamage struct {
 func AnalyzeSpikedDamage(fight *parser.Fight, windowSizeSeconds int, minThreshold int, increaseThreshold float64, minDPS int) map[string][]SpikeDamage {
 	spikes := make(map[string][]SpikeDamage)
 	minThresholdFactor := 0.1 // 10% of average bracket damage
+	maxSec := fight.Duration / 1000
 	for _, player := range fight.Players {
 		if len(player.DpsAll) == 0 || player.DpsAll[0].Dps <= minDPS {
 			continue
 		}
-		// Calculate average bracket damage for this player
+		// Build damagePerSecond once per player.
 		playerID := player.ID
-		maxSec := fight.Duration / 1000
-		var damagePerSecond []int
+		damagePerSecond := make([]int, maxSec+1)
 		for sec := 0; sec <= maxSec; sec++ {
-			dmg := 0
 			if entry, ok := fight.DamageTimeline[sec]; ok {
 				if pd, ok := entry.Players[playerID]; ok {
-					dmg = pd.Damage
+					damagePerSecond[sec] = pd.Damage
 				}
 			}
-			damagePerSecond = append(damagePerSecond, dmg)
 		}
 		bracketSize := windowSizeSeconds
 		nBrackets := len(damagePerSecond) / bracketSize
@@ -62,27 +58,14 @@ func AnalyzeSpikedDamage(fight *parser.Fight, windowSizeSeconds int, minThreshol
 			avgBracketDamage = totalBracketDamage / nBrackets
 		}
 		autoMinThreshold := int(float64(avgBracketDamage) * minThresholdFactor)
-		spikes[player.Name] = findSpikes(player, fight, autoMinThreshold, increaseThreshold)
+		spikes[player.Name] = findSpikes(player, damagePerSecond, autoMinThreshold, increaseThreshold)
 	}
 	return spikes
 }
 
 // findSpikes analyzes a single player's damage data to find spike windows
-func findSpikes(player parser.Player, fight *parser.Fight, minThreshold int, increaseThreshold float64) []SpikeDamage {
+func findSpikes(player parser.Player, damagePerSecond []int, minThreshold int, increaseThreshold float64) []SpikeDamage {
 	var result []SpikeDamage
-	playerID := player.ID
-	maxSec := fight.Duration / 1000
-	fmt.Printf("Player: %s, Fight duration: %d ms (%d sec)\n", player.Name, fight.Duration, maxSec)
-	var damagePerSecond []int
-	for sec := 0; sec <= maxSec; sec++ {
-		dmg := 0
-		if entry, ok := fight.DamageTimeline[sec]; ok {
-			if pd, ok := entry.Players[playerID]; ok {
-				dmg = pd.Damage
-			}
-		}
-		damagePerSecond = append(damagePerSecond, dmg)
-	}
 
 	bracketSize := 4
 	nBrackets := len(damagePerSecond) / bracketSize

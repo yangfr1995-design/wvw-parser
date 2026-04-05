@@ -1,20 +1,21 @@
 package parser
 
 import (
+	"bufio"
 	"encoding/json"
 	"os"
 )
 
 func ParseFight(file string) (*Fight, error) {
 
-	data, err := os.ReadFile(file)
+	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	var fight Fight
-	err = json.Unmarshal(data, &fight)
-	if err != nil {
+	if err := json.NewDecoder(bufio.NewReaderSize(f, 256*1024)).Decode(&fight); err != nil {
 		return nil, err
 	}
 
